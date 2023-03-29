@@ -1,0 +1,23 @@
+[package]
+name = "polkavm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT/Apache-2.0"
+
+[dependencies]
+goblin = "0.6.1"
+iced-x86 = { version = "1.18.0", features = ["code_asm"] }
+log = "0.4.17"
+nix = "0.26.2"
+
+[workspace]
+members = [".", "example-payload", "example-host"]
+
+[profile.minimal]
+inherits = "release"
+lto = "fat"
+panic = "abort"
+codegen-units = 1
+strip = true
+debug = false
+opt-level = "z"
