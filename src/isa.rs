@@ -190,6 +190,7 @@ pub enum Inst {
         src2: Reg,
     },
     Ecall,
+    Unimplemented,
 }
 
 impl Reg {
@@ -257,6 +258,13 @@ const fn bits(start: u32, end: u32, value: u32, position: u32) -> u32 {
 impl Inst {
     pub fn decode(op: u32, pc: u32) -> Option<Self> {
         debug_assert_eq!(pc % 4, 0);
+
+        // This is mostly unofficial, but it's a defacto standard used by both LLVM and GCC.
+        // https://github.com/riscv-non-isa/riscv-asm-manual/blob/master/riscv-asm.md#instruction-aliases
+        if op == 0xc0001073 {
+            return Some(Inst::Unimplemented);
+        }
+
         match op & 0b1111111 {
             0b0110111 => {
                 // LUI

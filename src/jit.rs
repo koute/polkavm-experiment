@@ -35,6 +35,7 @@ impl InstanceRef {
 
 pub trait UserContext {
     fn on_ecall(&mut self, _instance: &mut InstanceRef) -> ControlFlow<()>;
+    fn on_unimp(&mut self, _instance: &mut InstanceRef) {}
     fn on_step(&mut self, _instance: &mut InstanceRef, _pc: u32) {}
 }
 
@@ -424,6 +425,21 @@ impl<T> Module<T> {
             }
         }
 
+        extern "C" fn on_unimp<T>(memory: *mut u8, accessible_length: usize)
+        where
+            T: UserContext,
+        {
+            unsafe {
+                let userptr = *memory.add(accessible_length as usize).cast::<*mut T>();
+                let user = &mut *userptr;
+                let mut instance_ref = InstanceRef {
+                    memory,
+                    accessible_length,
+                };
+                user.on_unimp(&mut instance_ref);
+            }
+        }
+
         extern "C" fn on_step<T>(memory: *mut u8, accessible_length: usize, pc: u32)
         where
             T: UserContext,
@@ -438,6 +454,9 @@ impl<T> Module<T> {
                 user.on_step(&mut instance_ref, pc);
             }
         }
+
+        const TARGET_EXIT: u32 = u32::MAX;
+        const TARGET_UNIMP: u32 = u32::MAX - 1;
 
         for &(pc, op) in &program.opcodes {
             log::trace!("{:04x}: {:?}", pc, op);
@@ -772,12 +791,22 @@ impl<T> Module<T> {
                     asm.call(rax).unwrap();
                     asm.cmp(rax, 0).unwrap();
                     update_code!();
-                    branches.push((code.len(), current_rip, u32::MAX, iced_x86::Code::Je_rel32_64));
+                    branches.push((code.len(), current_rip, TARGET_EXIT, iced_x86::Code::Je_rel32_64));
                     for _ in 0..6 {
                         asm.nop().unwrap();
                     }
                     update_code!();
                     swap_native_out!();
+                }
+                Inst::Unimplemented => {
+                    update_code!();
+                    assert!(asm.instructions().is_empty());
+                    branches.push((code.len(), current_rip, TARGET_UNIMP, iced_x86::Code::Jmp_rel32_64));
+                    for _ in 0..5 {
+                        asm.nop().unwrap();
+                    }
+
+                    update_code!();
                 }
                 Inst::JumpAndLink { dst, target } => {
                     if dst != Reg::Zero {
@@ -1228,9 +1257,24 @@ impl<T> Module<T> {
         swap_native_in!();
         update_code!();
 
-        assert!(asm.instructions().is_empty());
         let exit_rip = current_rip;
+        asm.add(rsp, 8).unwrap();
+        asm.pop(r15).unwrap();
+        asm.pop(r14).unwrap();
+        asm.pop(r13).unwrap();
+        asm.pop(r12).unwrap();
+        asm.pop(rbx).unwrap();
+        asm.pop(rbp).unwrap();
+        asm.ret().unwrap();
+        update_code!();
 
+        let unimp_rip = current_rip;
+        swap_native_in!();
+        update_code!();
+        asm.mov(rdi, r15).unwrap();
+        asm.mov(rsi, data_size_accessible as u64).unwrap();
+        asm.mov(rax, on_unimp::<T> as u64).unwrap();
+        asm.call(rax).unwrap();
         asm.add(rsp, 8).unwrap();
         asm.pop(r15).unwrap();
         asm.pop(r14).unwrap();
@@ -1249,8 +1293,10 @@ impl<T> Module<T> {
         }
 
         for (code_offset, current_rip, branch_target, branch_kind) in branches {
-            let target_rip = if branch_target == u32::MAX {
+            let target_rip = if branch_target == TARGET_EXIT {
                 exit_rip
+            } else if branch_target == TARGET_UNIMP {
+                unimp_rip
             } else {
                 *labels.get((branch_target / 4) as usize).unwrap()
             };
