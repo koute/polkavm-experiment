@@ -1392,6 +1392,26 @@ impl<T> Instance<T> {
         regs[reg as usize] = value;
     }
 
+    pub fn user(&self) -> &T {
+        unsafe {
+            &**self
+                .pointer_data
+                .cast::<u8>()
+                .add(self.module.memory_prologue_size + self.module.data_size_accessible)
+                .cast::<*const T>()
+        }
+    }
+
+    pub fn user_mut(&mut self) -> &mut T {
+        unsafe {
+            &mut **self
+                .pointer_data
+                .cast::<u8>()
+                .add(self.module.memory_prologue_size + self.module.data_size_accessible)
+                .cast::<*mut T>()
+        }
+    }
+
     pub fn run(&mut self) {
         unsafe {
             let entry_point: extern "C" fn(usize) = core::mem::transmute(self.module.pointer_code);
