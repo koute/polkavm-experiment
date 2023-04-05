@@ -1191,7 +1191,8 @@ impl<T> Module<T> {
                             asm.shr(r_dst, cl).unwrap();
                         }
                         RegRegKind::ShiftArithmeticRight => {
-                            todo!()
+                            assert_eq!(r_src, ecx);
+                            asm.sar(r_dst, cl).unwrap();
                         }
                         RegRegKind::SetLessThanSigned => unreachable!(),
                         RegRegKind::SetLessThanUnsigned => unreachable!(),
