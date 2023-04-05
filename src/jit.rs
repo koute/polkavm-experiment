@@ -633,7 +633,7 @@ impl<T> Module<T> {
 
                             if $src != Reg::Zero {
                                 if let Some(r_src) = native_reg!($src) {
-                                    asm.mov($dst.r32(), r_src.r32()).unwrap();
+                                    asm.mov($dst.r64(), r_src.r64()).unwrap();
                                 } else {
                                     asm.mov($dst.r32(), byte_ptr(reg_in_mem!($src))).unwrap();
                                 }
