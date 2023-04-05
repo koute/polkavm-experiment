@@ -1061,21 +1061,17 @@ impl<T> Module<T> {
                 {
                     let r_src1 = get_reg!(src1);
                     let r_src2 = get_reg!(src2);
-                    let tmp = next_scratch_reg!();
-                    asm.xor(tmp.r32(), tmp.r32()).unwrap();
-                    asm.cmp(r_src1, r_src2).unwrap();
-                    if kind == RegRegKind::SetLessThanSigned {
-                        asm.setl(tmp.r8()).unwrap();
-                    } else {
-                        assert_eq!(kind, RegRegKind::SetLessThanUnsigned);
-                        asm.setb(tmp.r8()).unwrap();
-                    }
 
-                    if let Some(r) = native_reg!(dst) {
-                        asm.mov(r.r32(), tmp.r32()).unwrap();
-                    } else {
-                        asm.mov(dword_ptr(reg_in_mem!(dst)), tmp.r32()).unwrap();
-                    }
+                    asm.cmp(r_src1, r_src2).unwrap();
+                    set_reg! { dst => {
+                        if kind == RegRegKind::SetLessThanSigned {
+                            asm.setl(dst.r8()).unwrap();
+                        } else {
+                            assert_eq!(kind, RegRegKind::SetLessThanUnsigned);
+                            asm.setb(dst.r8()).unwrap();
+                        }
+                        asm.and(dst.r64(), 1).unwrap();
+                    }};
 
                     update_code!();
                 }
