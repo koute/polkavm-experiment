@@ -723,12 +723,12 @@ impl<T> Module<T> {
                 ($reg:ident => $code:block) => {{
                     if let Some(r) = native_reg!($reg) {
                         {
-                            let $reg = r.r32();
+                            let $reg = r;
                             $code;
                         }
                         update_code!();
                     } else {
-                        let reg = next_scratch_reg!(u32);
+                        let reg = next_scratch_reg!();
 
                         {
                             let $reg = reg;
@@ -736,7 +736,7 @@ impl<T> Module<T> {
                         }
 
                         if $reg != Reg::Zero {
-                            asm.mov(dword_ptr(reg_in_mem!($reg)), reg).unwrap();
+                            asm.mov(dword_ptr(reg_in_mem!($reg)), reg.r32()).unwrap();
                         }
                         update_code!();
                     }
@@ -757,7 +757,7 @@ impl<T> Module<T> {
                 Inst::AddUpperImmediateToPc { dst, value } => {
                     let value = (pc as i32 + value as i32) as u32;
                     set_reg! { dst => {
-                        asm.mov(dst, value).unwrap();
+                        asm.mov(dst.r32(), value).unwrap();
                     }};
                 }
                 Inst::JumpAndLinkRegister { dst, base, value } => {
@@ -776,7 +776,7 @@ impl<T> Module<T> {
                     // NOTE: This must be before the jump since 'dst' can be equal to 'base'.
                     if dst != Reg::Zero {
                         set_reg! { dst => {
-                            asm.mov(dst, (pc as u32).wrapping_add(4)).unwrap();
+                            asm.mov(dst.r32(), (pc as u32).wrapping_add(4)).unwrap();
                         }}
                     }
                     asm.jmp(qword_ptr(base64)).unwrap();
@@ -811,7 +811,7 @@ impl<T> Module<T> {
                 Inst::JumpAndLink { dst, target } => {
                     if dst != Reg::Zero {
                         set_reg! { dst => {
-                            asm.mov(dst, (pc as u32).wrapping_add(4)).unwrap();
+                            asm.mov(dst.r32(), (pc as u32).wrapping_add(4)).unwrap();
                         }}
 
                         update_code!();
@@ -887,27 +887,27 @@ impl<T> Module<T> {
                     match kind {
                         LoadKind::I8 => {
                             set_reg! { dst => {
-                                asm.movsx(dst, byte_ptr(base + offset)).unwrap();
+                                asm.movsx(dst.r32(), byte_ptr(base + offset)).unwrap();
                             }};
                         }
                         LoadKind::I16 => {
                             set_reg! { dst => {
-                                asm.movsx(dst, word_ptr(base + offset)).unwrap();
+                                asm.movsx(dst.r32(), word_ptr(base + offset)).unwrap();
                             }};
                         }
                         LoadKind::U32 => {
                             set_reg! { dst => {
-                                asm.mov(dst, dword_ptr(base + offset)).unwrap();
+                                asm.mov(dst.r32(), dword_ptr(base + offset)).unwrap();
                             }}
                         }
                         LoadKind::U8 => {
                             set_reg! { dst => {
-                                asm.movzx(dst, byte_ptr(base + offset)).unwrap();
+                                asm.movzx(dst.r32(), byte_ptr(base + offset)).unwrap();
                             }};
                         }
                         LoadKind::U16 => {
                             set_reg! { dst => {
-                                asm.movzx(dst, word_ptr(base + offset)).unwrap();
+                                asm.movzx(dst.r32(), word_ptr(base + offset)).unwrap();
                             }};
                         }
                     }
@@ -954,7 +954,7 @@ impl<T> Module<T> {
                 }
                 Inst::LoadUpperImmediate { dst, value } => {
                     set_reg! { dst => {
-                        asm.mov(dst, value).unwrap();
+                        asm.mov(dst.r32(), value).unwrap();
                     }};
                 }
                 Inst::RegImm {
@@ -966,11 +966,11 @@ impl<T> Module<T> {
                     if is_reg_native!(dst) {
                         if imm == 0 {
                             set_reg! { dst => {
-                                asm.xor(dst, dst).unwrap();
+                                asm.xor(dst.r32(), dst.r32()).unwrap();
                             }};
                         } else {
                             set_reg! { dst => {
-                                asm.mov(dst, imm).unwrap();
+                                asm.mov(dst.r32(), imm).unwrap();
                             }};
                         }
                     } else {
@@ -990,7 +990,7 @@ impl<T> Module<T> {
                     RegImmKind::Add => {
                         let src = get_reg!(src);
                         set_reg! { dst => {
-                            asm.lea(dst, dword_ptr(src + imm)).unwrap();
+                            asm.lea(dst.r32(), dword_ptr(src + imm)).unwrap();
                         }};
                     }
                     RegImmKind::SetLessThanSigned => {
@@ -1000,7 +1000,7 @@ impl<T> Module<T> {
                             asm.xor(tmp.r32(), tmp.r32()).unwrap();
                             asm.cmp(src, imm).unwrap();
                             asm.setl(tmp.r8()).unwrap();
-                            asm.mov(dst, tmp.r32()).unwrap();
+                            asm.mov(dst.r32(), tmp.r32()).unwrap();
                         }};
                     }
                     RegImmKind::SetLessThanUnsigned => {
@@ -1010,7 +1010,7 @@ impl<T> Module<T> {
                             asm.xor(tmp.r32(), tmp.r32()).unwrap();
                             asm.cmp(src, imm).unwrap();
                             asm.setb(tmp.r8()).unwrap();
-                            asm.mov(dst, tmp.r32()).unwrap();
+                            asm.mov(dst.r32(), tmp.r32()).unwrap();
                         }};
                     }
                     RegImmKind::Xor => {
@@ -1053,7 +1053,7 @@ impl<T> Module<T> {
                     src2,
                 } if src1 == src2 => {
                     set_reg! { dst => {
-                        asm.xor(dst, dst).unwrap();
+                        asm.xor(dst.r32(), dst.r32()).unwrap();
                     }};
                 }
                 Inst::RegReg { kind, dst, src1, src2 }
