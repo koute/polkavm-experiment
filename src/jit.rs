@@ -1120,27 +1120,23 @@ impl<T> Module<T> {
                     );
 
                     let (r_dst, r_src) = if dst == src1 && dst == src2 {
-                        let r_dst = {
-                            let r = get_reg!(dst);
-                            r.r32()
-                        };
-
+                        let r_dst = get_reg!(dst);
                         let r_src = r_dst;
                         (r_dst, r_src)
                     } else if dst == src1 {
                         let r_src = if requires_ecx {
                             assert!(!used_regs.rcx);
-                            get_reg!(src2: ecx).r32()
+                            get_reg!(src2: ecx)
                         } else {
-                            get_reg!(src2).r32()
+                            get_reg!(src2)
                         };
 
                         let r_dst = if let Some(r) = native_reg!(dst) {
-                            r.r32()
+                            r
                         } else {
                             let r = next_scratch_reg!();
-                            asm.mov(r.r32, dword_ptr(reg_in_mem!(src1))).unwrap();
-                            r.r32()
+                            asm.mov(r.r32(), dword_ptr(reg_in_mem!(src1))).unwrap();
+                            r
                         };
 
                         (r_dst, r_src)
@@ -1148,70 +1144,66 @@ impl<T> Module<T> {
                         let r_src = if requires_ecx {
                             assert!(!used_regs.rcx);
                             used_regs.rcx = true;
-                            ecx
+                            RCX
                         } else {
-                            next_scratch_reg!().r32()
+                            next_scratch_reg!()
                         };
 
-                        let r_dst = {
-                            let r = get_reg!(dst);
-                            r.r32()
-                        };
-                        asm.mov(r_src, r_dst).unwrap();
+                        let r_dst = get_reg!(dst);
+                        asm.mov(r_src.r32(), r_dst.r32()).unwrap();
 
                         if let Some(r) = native_reg!(src1) {
-                            asm.mov(r_dst, r.r32()).unwrap();
+                            asm.mov(r_dst.r32(), r.r32()).unwrap();
                         } else {
-                            asm.mov(r_dst, dword_ptr(reg_in_mem!(src1))).unwrap();
+                            asm.mov(r_dst.r32(), dword_ptr(reg_in_mem!(src1))).unwrap();
                         }
 
                         (r_dst, r_src)
                     } else {
                         let r_src = if requires_ecx {
                             assert!(!used_regs.rcx);
-                            get_reg!(src2: ecx).r32()
+                            get_reg!(src2: ecx)
                         } else {
-                            get_reg!(src2).r32()
+                            get_reg!(src2)
                         };
 
                         let r_dst = if let Some(r) = native_reg!(dst) {
-                            r.r32()
+                            r
                         } else {
-                            let r = next_scratch_reg!();
-                            r.r32()
+                            next_scratch_reg!()
                         };
 
                         if let Some(r) = native_reg!(src1) {
-                            asm.mov(r_dst, r.r32()).unwrap();
+                            asm.mov(r_dst.r32(), r.r32()).unwrap();
                         } else {
-                            asm.mov(r_dst, dword_ptr(reg_in_mem!(src1))).unwrap();
+                            asm.mov(r_dst.r32(), dword_ptr(reg_in_mem!(src1))).unwrap();
                         }
 
                         (r_dst, r_src)
                     };
 
                     match kind {
-                        RegRegKind::Add => asm.add(r_dst, r_src).unwrap(),
-                        RegRegKind::Sub => asm.sub(r_dst, r_src).unwrap(),
-                        RegRegKind::Xor => asm.xor(r_dst, r_src).unwrap(),
-                        RegRegKind::Or => asm.or(r_dst, r_src).unwrap(),
-                        RegRegKind::And => asm.and(r_dst, r_src).unwrap(),
+                        RegRegKind::Add => asm.add(r_dst.r32(), r_src.r32()).unwrap(),
+                        RegRegKind::Sub => asm.sub(r_dst.r32(), r_src.r32()).unwrap(),
+                        RegRegKind::Xor => asm.xor(r_dst.r32(), r_src.r32()).unwrap(),
+                        RegRegKind::Or => asm.or(r_dst.r32(), r_src.r32()).unwrap(),
+                        RegRegKind::And => asm.and(r_dst.r32(), r_src.r32()).unwrap(),
                         RegRegKind::ShiftLogicalLeft => {
-                            assert_eq!(r_src, ecx);
-                            asm.shl(r_dst, cl).unwrap();
+                            assert_eq!(r_src.r32(), ecx);
+                            asm.shl(r_dst.r32(), cl).unwrap();
                         }
                         RegRegKind::ShiftLogicalRight => {
-                            assert_eq!(r_src, ecx);
-                            asm.shr(r_dst, cl).unwrap();
+                            assert_eq!(r_src.r32(), ecx);
+                            asm.shr(r_dst.r32(), cl).unwrap();
                         }
                         RegRegKind::ShiftArithmeticRight => {
-                            assert_eq!(r_src, ecx);
-                            asm.sar(r_dst, cl).unwrap();
+                            assert_eq!(r_src.r32(), ecx);
+                            asm.sar(r_dst.r32(), cl).unwrap();
                         }
                         RegRegKind::SetLessThanSigned => unreachable!(),
                         RegRegKind::SetLessThanUnsigned => unreachable!(),
                         RegRegKind::Mul => {
-                            asm.imul_2(r_dst, r_src).unwrap();
+                            asm.imul_2(r_dst.r32(), r_src.r32()).unwrap();
                         }
                         RegRegKind::MulUpperSignedSigned => {
                             // movsxd	rcx, edi
@@ -1234,11 +1226,11 @@ impl<T> Module<T> {
                             // shr	rax, 32
                             let tmp1 = next_scratch_reg!();
                             let tmp2 = next_scratch_reg!();
-                            asm.movsxd(tmp1.r64(), r_dst).unwrap();
-                            asm.mov(tmp2.r32(), r_src).unwrap();
+                            asm.movsxd(tmp1.r64(), r_dst.r32()).unwrap();
+                            asm.mov(tmp2.r32(), r_src.r32()).unwrap();
                             asm.imul_2(tmp2.r64(), tmp1.r64()).unwrap();
                             asm.shr(tmp2.r64(), 32).unwrap();
-                            asm.mov(r_dst, tmp2.r32()).unwrap();
+                            asm.mov(r_dst.r32(), tmp2.r32()).unwrap();
                         }
                         RegRegKind::Div => {
                             todo!();
@@ -1255,7 +1247,7 @@ impl<T> Module<T> {
                     };
 
                     if !is_reg_native!(dst) && dst != Reg::Zero {
-                        asm.mov(dword_ptr(reg_in_mem!(dst)), r_dst).unwrap();
+                        asm.mov(dword_ptr(reg_in_mem!(dst)), r_dst.r32()).unwrap();
                     }
 
                     update_code!();
