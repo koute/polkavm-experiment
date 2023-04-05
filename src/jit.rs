@@ -203,7 +203,7 @@ impl<T> Module<T> {
             };
         }
 
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, PartialEq, Eq)]
         struct R {
             r64: iced_x86::code_asm::AsmRegister64,
             r32: iced_x86::code_asm::AsmRegister32,
@@ -498,6 +498,18 @@ impl<T> Module<T> {
                         used_regs.rbx = true;
                     }
                 }
+            }
+
+            macro_rules! release_reg {
+                ($reg:expr) => {
+                    if $reg == RDX {
+                        used_regs.rdx = false;
+                    } else if $reg == RCX {
+                        used_regs.rcx = false;
+                    } else {
+                        unreachable!()
+                    }
+                };
             }
 
             macro_rules! next_scratch_reg {
@@ -1001,6 +1013,14 @@ impl<T> Module<T> {
                     let r_src2 = get_reg!(src2);
 
                     asm.cmp(r_src1.r32(), r_src2.r32()).unwrap();
+                    if !is_reg_native!(src1) {
+                        release_reg!(r_src1);
+                    }
+
+                    if !is_reg_native!(src2) {
+                        release_reg!(r_src2);
+                    }
+
                     set_reg! { dst => {
                         if kind == RegRegKind::SetLessThanSigned {
                             asm.setl(dst.r8()).unwrap();
