@@ -877,23 +877,36 @@ impl<T> Module<T> {
                         r15
                     };
 
-                    match kind {
-                        StoreKind::U8 => {
-                            let src = get_reg!(src);
-                            asm.mov(byte_ptr(base + offset), src.r8()).unwrap();
-                            update_code!();
+                    if src != Reg::Zero {
+                        match kind {
+                            StoreKind::U8 => {
+                                let src = get_reg!(src);
+                                asm.mov(byte_ptr(base + offset), src.r8()).unwrap();
+                            }
+                            StoreKind::U16 => {
+                                let src = get_reg!(src);
+                                asm.mov(word_ptr(base + offset), src.r16()).unwrap();
+                            }
+                            StoreKind::U32 => {
+                                let src = get_reg!(src);
+                                asm.mov(dword_ptr(base + offset), src.r32()).unwrap();
+                            }
                         }
-                        StoreKind::U16 => {
-                            let src = get_reg!(src);
-                            asm.mov(word_ptr(base + offset), src.r16()).unwrap();
-                            update_code!();
-                        }
-                        StoreKind::U32 => {
-                            let src = get_reg!(src);
-                            asm.mov(dword_ptr(base + offset), src.r32()).unwrap();
-                            update_code!();
+                    } else {
+                        match kind {
+                            StoreKind::U8 => {
+                                asm.mov(byte_ptr(base + offset), 0).unwrap();
+                            }
+                            StoreKind::U16 => {
+                                asm.mov(word_ptr(base + offset), 0).unwrap();
+                            }
+                            StoreKind::U32 => {
+                                asm.mov(dword_ptr(base + offset), 0).unwrap();
+                            }
                         }
                     }
+
+                    update_code!();
                 }
                 Inst::LoadUpperImmediate { dst: Reg::Zero, .. }
                 | Inst::RegImm { dst: Reg::Zero, .. }
