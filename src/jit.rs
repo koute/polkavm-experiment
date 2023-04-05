@@ -785,7 +785,7 @@ impl<T> Module<T> {
                     macro_rules! branch {
                         ($kind:ident) => {{
                             assert!(asm.instructions().is_empty());
-                            branches.push((code.len(), current_rip, target, iced_x86::Code::$kind));
+                            branches.push((code.len(), current_rip, target, $kind));
                             for _ in 0..6 {
                                 asm.nop().unwrap();
                             }
@@ -794,30 +794,57 @@ impl<T> Module<T> {
                         }};
                     }
 
-                    let src1 = get_reg!(src1);
-                    let src2 = get_reg!(src2);
-                    asm.cmp(src1.r32(), src2.r32()).unwrap();
+                    let mut invert = false;
+                    if src1 == Reg::Zero {
+                        let r_src2 = get_reg!(src2);
+                        asm.cmp(r_src2.r32(), 0).unwrap();
+                        invert = true;
+                    } else if src2 == Reg::Zero {
+                        let r_src1 = get_reg!(src1);
+                        asm.cmp(r_src1.r32(), 0).unwrap();
+                    } else {
+                        let r_src1 = get_reg!(src1);
+                        let r_src2 = get_reg!(src2);
+                        asm.cmp(r_src1.r32(), r_src2.r32()).unwrap();
+                    }
+
                     update_code!();
-                    match kind {
-                        BranchKind::Eq => {
-                            branch!(Je_rel32_64)
-                        }
-                        BranchKind::NotEq => {
-                            branch!(Jne_rel32_64)
-                        }
+
+                    use iced_x86::Code::*;
+                    let kind = match kind {
+                        BranchKind::Eq => Je_rel32_64,
+                        BranchKind::NotEq => Jne_rel32_64,
                         BranchKind::LessSigned => {
-                            branch!(Jl_rel32_64)
+                            if !invert {
+                                Jl_rel32_64
+                            } else {
+                                Jge_rel32_64
+                            }
                         }
                         BranchKind::GreaterOrEqualSigned => {
-                            branch!(Jge_rel32_64)
+                            if !invert {
+                                Jge_rel32_64
+                            } else {
+                                Jl_rel32_64
+                            }
                         }
                         BranchKind::LessUnsigned => {
-                            branch!(Jb_rel32_64)
+                            if !invert {
+                                Jb_rel32_64
+                            } else {
+                                Jae_rel32_64
+                            }
                         }
                         BranchKind::GreaterOrEqualUnsigned => {
-                            branch!(Jae_rel32_64);
+                            if !invert {
+                                Jae_rel32_64
+                            } else {
+                                Jb_rel32_64
+                            }
                         }
-                    }
+                    };
+
+                    branch!(kind)
                 }
                 Inst::Load {
                     kind,
