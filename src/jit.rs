@@ -562,7 +562,7 @@ impl<T> Module<T> {
 
             macro_rules! get_reg {
                 ($reg:ident) => {
-                    get_reg!($reg: u32)
+                    get_reg!($reg: ..)
                 };
 
                 ($reg:ident: ecx) => {{
@@ -577,7 +577,7 @@ impl<T> Module<T> {
                     } else {
                         todo!()
                     }
-                    ecx
+                    RCX
                 }};
 
                 ($reg:ident: ..) => {{
@@ -659,7 +659,7 @@ impl<T> Module<T> {
                     if $dst == $src {
                         if let Some(r) = native_reg!($dst) {
                             #[allow(unused_variables)]
-                            let $dst = r.r32();
+                            let $dst = r;
                             $code;
                         } else {
                             let reg = get_reg!($dst);
@@ -672,18 +672,18 @@ impl<T> Module<T> {
                             }
 
                             if $dst != Reg::Zero {
-                                asm.mov(dword_ptr(reg_in_mem!($dst)), reg).unwrap();
+                                asm.mov(dword_ptr(reg_in_mem!($dst)), reg.r32()).unwrap();
                             }
                         }
                     } else {
                         if let Some(r_dst) = native_reg!($dst) {
-                            let $dst = r_dst.r32();
+                            let $dst = r_dst;
 
                             if $src != Reg::Zero {
                                 if let Some(r_src) = native_reg!($src) {
-                                    asm.mov($dst, r_src.r32()).unwrap();
+                                    asm.mov($dst.r32(), r_src.r32()).unwrap();
                                 } else {
-                                    asm.mov($dst, byte_ptr(reg_in_mem!($src))).unwrap();
+                                    asm.mov($dst.r32(), byte_ptr(reg_in_mem!($src))).unwrap();
                                 }
                             }
 
@@ -691,13 +691,13 @@ impl<T> Module<T> {
                             let $src = ();
                             $code;
                         } else {
-                            let dst = next_scratch_reg!(u32);
+                            let dst = next_scratch_reg!();
 
                             if $src != Reg::Zero {
                                 if let Some(r_src) = native_reg!($src) {
-                                    asm.mov(dst, r_src.r32()).unwrap();
+                                    asm.mov(dst.r32(), r_src.r32()).unwrap();
                                 } else {
-                                    asm.mov(dst, byte_ptr(reg_in_mem!($src))).unwrap();
+                                    asm.mov(dst.r32(), byte_ptr(reg_in_mem!($src))).unwrap();
                                 }
                             }
 
@@ -710,7 +710,7 @@ impl<T> Module<T> {
                             }
 
                             if $dst != Reg::Zero {
-                                asm.mov(dword_ptr(reg_in_mem!($dst)), dst).unwrap();
+                                asm.mov(dword_ptr(reg_in_mem!($dst)), dst.r32()).unwrap();
                             }
                         }
                     }
@@ -846,7 +846,7 @@ impl<T> Module<T> {
 
                     let src1 = get_reg!(src1);
                     let src2 = get_reg!(src2);
-                    asm.cmp(src1, src2).unwrap();
+                    asm.cmp(src1.r32(), src2.r32()).unwrap();
                     update_code!();
                     match kind {
                         BranchKind::Eq => {
@@ -929,18 +929,18 @@ impl<T> Module<T> {
 
                     match kind {
                         StoreKind::U8 => {
-                            let src = get_reg!(src: u8);
-                            asm.mov(byte_ptr(base + offset), src).unwrap();
+                            let src = get_reg!(src);
+                            asm.mov(byte_ptr(base + offset), src.r8()).unwrap();
                             update_code!();
                         }
                         StoreKind::U16 => {
-                            let src = get_reg!(src: u16);
-                            asm.mov(word_ptr(base + offset), src).unwrap();
+                            let src = get_reg!(src);
+                            asm.mov(word_ptr(base + offset), src.r16()).unwrap();
                             update_code!();
                         }
                         StoreKind::U32 => {
                             let src = get_reg!(src);
-                            asm.mov(dword_ptr(base + offset), src).unwrap();
+                            asm.mov(dword_ptr(base + offset), src.r32()).unwrap();
                             update_code!();
                         }
                     }
@@ -990,7 +990,7 @@ impl<T> Module<T> {
                     RegImmKind::Add => {
                         let src = get_reg!(src);
                         set_reg! { dst => {
-                            asm.lea(dst.r32(), dword_ptr(src + imm)).unwrap();
+                            asm.lea(dst.r32(), dword_ptr(src.r32() + imm)).unwrap();
                         }};
                     }
                     RegImmKind::SetLessThanSigned => {
@@ -998,7 +998,7 @@ impl<T> Module<T> {
                         let src = get_reg!(src);
                         set_reg! { dst => {
                             asm.xor(tmp.r32(), tmp.r32()).unwrap();
-                            asm.cmp(src, imm).unwrap();
+                            asm.cmp(src.r32(), imm).unwrap();
                             asm.setl(tmp.r8()).unwrap();
                             asm.mov(dst.r32(), tmp.r32()).unwrap();
                         }};
@@ -1008,41 +1008,41 @@ impl<T> Module<T> {
                         let src = get_reg!(src);
                         set_reg! { dst => {
                             asm.xor(tmp.r32(), tmp.r32()).unwrap();
-                            asm.cmp(src, imm).unwrap();
+                            asm.cmp(src.r32(), imm).unwrap();
                             asm.setb(tmp.r8()).unwrap();
                             asm.mov(dst.r32(), tmp.r32()).unwrap();
                         }};
                     }
                     RegImmKind::Xor => {
                         get_set_reg!( dst = src => {
-                            asm.xor(dst, imm).unwrap();
+                            asm.xor(dst.r32(), imm).unwrap();
                         });
                     }
                     RegImmKind::Or => {
                         get_set_reg!( dst = src => {
-                            asm.or(dst, imm).unwrap();
+                            asm.or(dst.r32(), imm).unwrap();
                         });
                     }
                     RegImmKind::And => {
                         get_set_reg!( dst = src => {
-                            asm.and(dst, imm).unwrap();
+                            asm.and(dst.r32(), imm).unwrap();
                         });
                     }
                 },
                 Inst::Shift { kind, dst, src, amount } => match kind {
                     ShiftKind::LogicalLeft => {
                         get_set_reg!( dst = src => {
-                            asm.shl(dst, amount as u32).unwrap();
+                            asm.shl(dst.r32(), amount as u32).unwrap();
                         });
                     }
                     ShiftKind::LogicalRight => {
                         get_set_reg!( dst = src => {
-                            asm.shr(dst, amount as u32).unwrap();
+                            asm.shr(dst.r32(), amount as u32).unwrap();
                         });
                     }
                     ShiftKind::ArithmeticRight => {
                         get_set_reg!( dst = src => {
-                            asm.sar(dst, amount as u32).unwrap();
+                            asm.sar(dst.r32(), amount as u32).unwrap();
                         });
                     }
                 },
@@ -1062,7 +1062,7 @@ impl<T> Module<T> {
                     let r_src1 = get_reg!(src1);
                     let r_src2 = get_reg!(src2);
 
-                    asm.cmp(r_src1, r_src2).unwrap();
+                    asm.cmp(r_src1.r32(), r_src2.r32()).unwrap();
                     set_reg! { dst => {
                         if kind == RegRegKind::SetLessThanSigned {
                             asm.setl(dst.r8()).unwrap();
@@ -1103,7 +1103,7 @@ impl<T> Module<T> {
 
                     let (r_dst, r_src) = if dst == src1 && dst == src2 {
                         let r_dst = {
-                            let r = get_reg!(dst: ..);
+                            let r = get_reg!(dst);
                             r.r32()
                         };
 
@@ -1112,9 +1112,9 @@ impl<T> Module<T> {
                     } else if dst == src1 {
                         let r_src = if requires_ecx {
                             assert!(!used_regs.rcx);
-                            get_reg!(src2: ecx)
+                            get_reg!(src2: ecx).r32()
                         } else {
-                            get_reg!(src2)
+                            get_reg!(src2).r32()
                         };
 
                         let r_dst = if let Some(r) = native_reg!(dst) {
@@ -1136,7 +1136,7 @@ impl<T> Module<T> {
                         };
 
                         let r_dst = {
-                            let r = get_reg!(dst: ..);
+                            let r = get_reg!(dst);
                             r.r32()
                         };
                         asm.mov(r_src, r_dst).unwrap();
@@ -1151,9 +1151,9 @@ impl<T> Module<T> {
                     } else {
                         let r_src = if requires_ecx {
                             assert!(!used_regs.rcx);
-                            get_reg!(src2: ecx)
+                            get_reg!(src2: ecx).r32()
                         } else {
-                            get_reg!(src2)
+                            get_reg!(src2).r32()
                         };
 
                         let r_dst = if let Some(r) = native_reg!(dst) {
