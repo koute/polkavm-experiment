@@ -1049,27 +1049,45 @@ impl<T> Module<T> {
                 Inst::RegReg { kind, dst, src1, src2 }
                     if kind == RegRegKind::SetLessThanSigned || kind == RegRegKind::SetLessThanUnsigned =>
                 {
-                    let r_src1 = get_reg!(src1);
-                    let r_src2 = get_reg!(src2);
-
-                    asm.cmp(r_src1.r32(), r_src2.r32()).unwrap();
-                    if !is_reg_native!(src1) {
-                        release_reg!(r_src1);
-                    }
-
-                    if !is_reg_native!(src2) {
-                        release_reg!(r_src2);
-                    }
-
-                    set_reg! { dst => {
+                    if src1 == Reg::Zero {
+                        let r_src2 = get_reg!(src2);
                         if kind == RegRegKind::SetLessThanSigned {
-                            asm.setl(dst.r8()).unwrap();
+                            asm.cmp(r_src2.r32(), 0).unwrap();
+                            set_reg! { dst => {
+                                asm.setge(dst.r8()).unwrap();
+                                asm.and(dst.r64(), 1).unwrap();
+                            }};
                         } else {
                             assert_eq!(kind, RegRegKind::SetLessThanUnsigned);
-                            asm.setb(dst.r8()).unwrap();
+                            asm.test(r_src2.r32(), r_src2.r32()).unwrap();
+                            set_reg! { dst => {
+                                asm.setne(dst.r8()).unwrap();
+                                asm.and(dst.r64(), 1).unwrap();
+                            }};
                         }
-                        asm.and(dst.r64(), 1).unwrap();
-                    }};
+                    } else {
+                        let r_src1 = get_reg!(src1);
+                        let r_src2 = get_reg!(src2);
+
+                        asm.cmp(r_src1.r32(), r_src2.r32()).unwrap();
+                        if !is_reg_native!(src1) {
+                            release_reg!(r_src1);
+                        }
+
+                        if !is_reg_native!(src2) {
+                            release_reg!(r_src2);
+                        }
+
+                        set_reg! { dst => {
+                            if kind == RegRegKind::SetLessThanSigned {
+                                asm.setl(dst.r8()).unwrap();
+                            } else {
+                                assert_eq!(kind, RegRegKind::SetLessThanUnsigned);
+                                asm.setb(dst.r8()).unwrap();
+                            }
+                            asm.and(dst.r64(), 1).unwrap();
+                        }};
+                    }
 
                     update_code!();
                 }
