@@ -542,29 +542,9 @@ impl<T> Module<T> {
                         unreachable!("ran out of temporary registers")
                     }
                 };
-
-                (u64) => {
-                    next_scratch_reg!().r64()
-                };
-
-                (u32) => {
-                    next_scratch_reg!().r32()
-                };
-
-                (u16) => {
-                    next_scratch_reg!().r16()
-                };
-
-                (u8) => {
-                    next_scratch_reg!().r8()
-                };
             }
 
             macro_rules! get_reg {
-                ($reg:ident) => {
-                    get_reg!($reg: ..)
-                };
-
                 ($reg:ident: ecx) => {{
                     if !used_regs.rcx {
                         used_regs.rcx = true;
@@ -580,7 +560,7 @@ impl<T> Module<T> {
                     RCX
                 }};
 
-                ($reg:ident: ..) => {{
+                ($reg:ident) => {{
                     if $reg != Reg::Zero {
                         if let Some(r) = native_reg!($reg) {
                             r
@@ -597,59 +577,17 @@ impl<T> Module<T> {
                         r
                     }
                 }};
-
-                ($reg:ident: u64) => {{
-                    get_reg!($reg: ..).r64()
-                }};
-
-                ($reg:ident: u32) => {{
-                    get_reg!($reg: ..).r32()
-                }};
-
-                ($reg:ident: u16) => {{
-                    if let Some(r) = native_reg!($reg) {
-                        r.r16()
-                    } else {
-                        let reg = next_scratch_reg!(u16);
-                        if $reg != Reg::Zero {
-                            asm.movzx(reg, word_ptr(reg_in_mem!($reg))).unwrap();
-                        } else {
-                            asm.xor(reg, reg).unwrap();
-                        }
-                        update_code!();
-                        reg
-                    }
-                }};
-
-                ($reg:ident: u8) => {{
-                    if let Some(r) = native_reg!($reg) {
-                        r.r8()
-                    } else {
-                        let reg = next_scratch_reg!(u8);
-                        if $reg != Reg::Zero {
-                            asm.mov(reg, byte_ptr(reg_in_mem!($reg))).unwrap();
-                        } else {
-                            asm.xor(reg, reg).unwrap();
-                        }
-                        update_code!();
-                        reg
-                    }
-                }};
             }
 
             macro_rules! get_reg_scratch {
-                ($reg:ident: u64) => {
-                    get_reg_scratch!($reg: ..).r64()
-                };
-
-                ($reg:ident: ..) => {
+                ($reg:ident) => {
                     if let Some(r) = native_reg!($reg) {
                         let reg = next_scratch_reg!();
                         asm.mov(reg.r64(), r.r64()).unwrap();
                         update_code!();
                         reg
                     } else {
-                        get_reg!($reg: ..)
+                        get_reg!($reg)
                     }
                 };
             }
@@ -761,7 +699,7 @@ impl<T> Module<T> {
                     }};
                 }
                 Inst::JumpAndLinkRegister { dst, base, value } => {
-                    let base = get_reg_scratch!(base: ..);
+                    let base = get_reg_scratch!(base);
                     let base64 = base.r64();
                     let base32 = base.r32();
                     if value != 0 {
@@ -877,7 +815,7 @@ impl<T> Module<T> {
                 } => {
                     let offset = offset as i64;
                     let base = if base != Reg::Zero {
-                        let base = get_reg_scratch!(base: u64);
+                        let base = get_reg_scratch!(base).r64();
                         asm.add(base, r15).unwrap();
                         base
                     } else {
@@ -920,7 +858,7 @@ impl<T> Module<T> {
                 } => {
                     let offset = offset as i64;
                     let base = if base != Reg::Zero {
-                        let base = get_reg_scratch!(base: u64);
+                        let base = get_reg_scratch!(base).r64();
                         asm.add(base, r15).unwrap();
                         base
                     } else {
@@ -1132,7 +1070,7 @@ impl<T> Module<T> {
                             used_regs.rcx = true;
                             ecx
                         } else {
-                            next_scratch_reg!(u32)
+                            next_scratch_reg!().r32()
                         };
 
                         let r_dst = {
