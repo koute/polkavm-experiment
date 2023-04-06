@@ -82,6 +82,7 @@ impl<T> Drop for Instance<T> {
 pub struct Program<'a> {
     data: &'a [u8],
     opcodes: Vec<(u32, Inst)>,
+    used_reg_count: usize,
 }
 
 impl<'a> Program<'a> {
@@ -98,6 +99,8 @@ impl<'a> Program<'a> {
             })
             .unwrap();
 
+        let mut used_regs = [false; 32];
+
         let text =
             &data[text_section.sh_offset as usize..text_section.sh_offset as usize + text_section.sh_size as usize];
         let text = unsafe { std::slice::from_raw_parts(text.as_ptr().cast::<u32>(), text.len() / 4) };
@@ -105,6 +108,38 @@ impl<'a> Program<'a> {
         for (nth, &op) in text.iter().enumerate() {
             let pc = nth as u32 * 4;
             if let Some(op) = Inst::decode(op, pc) {
+                match op {
+                    Inst::LoadUpperImmediate { dst, .. }
+                    | Inst::AddUpperImmediateToPc { dst, .. }
+                    | Inst::JumpAndLink { dst, .. } => used_regs[dst as usize] = true,
+                    Inst::JumpAndLinkRegister { dst, base, .. } | Inst::Load { dst, base, .. } => {
+                        used_regs[dst as usize] = true;
+                        used_regs[base as usize] = true;
+                    }
+
+                    Inst::Store { src, base, .. } => {
+                        used_regs[src as usize] = true;
+                        used_regs[base as usize] = true;
+                    }
+
+                    Inst::Branch { src1, src2, .. } => {
+                        used_regs[src1 as usize] = true;
+                        used_regs[src2 as usize] = true;
+                    }
+
+                    Inst::RegImm { dst, src, .. } | Inst::Shift { dst, src, .. } => {
+                        used_regs[dst as usize] = true;
+                        used_regs[src as usize] = true;
+                    }
+
+                    Inst::RegReg { dst, src1, src2, .. } => {
+                        used_regs[dst as usize] = true;
+                        used_regs[src1 as usize] = true;
+                        used_regs[src2 as usize] = true;
+                    }
+                    Inst::Ecall | Inst::Unimplemented => {}
+                }
+
                 match op {
                     Inst::JumpAndLinkRegister {
                         dst: ra_dst,
@@ -135,8 +170,14 @@ impl<'a> Program<'a> {
         }
 
         let data = &data[0x1000..];
+        let used_reg_count = used_regs.iter().filter(|is_used| **is_used).count();
+        log::debug!("Program is using {} registers", used_reg_count);
 
-        Program { data, opcodes }
+        Program {
+            data,
+            opcodes,
+            used_reg_count,
+        }
     }
 }
 
@@ -353,7 +394,7 @@ impl<T> Module<T> {
                     Reg::A5 => Some(RBP),
                     Reg::T0 => Some(RAX),
                     Reg::T1 => Some(RBX),
-                    Reg::T2 => Some(RDX),
+                    Reg::T2 if program.used_reg_count <= 14 => Some(RDX),
                     _ => None,
                 }
             };
